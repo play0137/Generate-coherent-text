@@ -8,7 +8,7 @@ We evaluated generated text by human rating, and it is more coherent when using 
 Please refer to [Chinese ConceptNet](https://github.com/play0137/Chinese_ConceptNet)
 
 # Dependencies
-- python version ...  
+- python version ...  hyperlink
 - required packages ... 
 
 # How to run
