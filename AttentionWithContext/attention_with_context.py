@@ -1,6 +1,6 @@
 from keras import backend as K
 # from keras.engine.topology import Layer # 2.2.4
-from tensorflow.keras.layers import Layer, InputSpec # keras 2.5.3
+from tensorflow.keras.layers import Layer, InputSpec # keras 2.6.0
 from keras import initializers as initializers, regularizers, constraints
 		
 class AttentionWithContext(Layer):

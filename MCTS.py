@@ -1,14 +1,29 @@
 """
+This work includes data from ConceptNet 5, which was compiled by the
+Commonsense Computing Initiative. ConceptNet 5 is freely available under
+the Creative Commons Attribution-ShareAlike license (CC BY SA 3.0) from
+http://conceptnet.io.
+
+The included data was created by contributors to Commonsense Computing
+projects, contributors to Wikimedia projects, DBPedia, OpenCyc, Games
+with a Purpose, Princeton University's WordNet, Francis Bond's Open
+Multilingual WordNet, and Jim Breen's JMDict.
+
+                                                                                                                                       
+Dependencies:
 python 3.9.12
 tensorflow 2.6.0
 keras 2.6.0
 gensim 4.1.2
+
+
+Reference:
+    Ying-Ren Chen (2021). Generate coherent text using semantic embedding, common sense templates and Monte-Carlo tree search methods (Master's thesis, National Tsing Hua University, Hsinchu, Taiwan).
 """
 
 """ built-in packages """
 import sys
 import re
-import pdb
 import time
 import copy
 import random
@@ -24,7 +39,7 @@ import jieba
 """ 分配GPU (要同時跑兩個時會用到)"""
 import tensorflow as tf
 config = tf.compat.v1.ConfigProto()
-config.gpu_options.allocator_type = 'BFC' #A "Best-fit with coalescing" algorithm, simplified from a version of dlmalloc.
+config.gpu_options.allocator_type = 'BFC' # A "Best-fit with coalescing" algorithm, simplified from a version of dlmalloc.
 config.gpu_options.per_process_gpu_memory_fraction = 0.7
 config.gpu_options.allow_growth =True
 tf.compat.v1.keras.backend.set_session(tf.compat.v1.Session(config=config))
@@ -37,8 +52,9 @@ from keras.models import load_model
 from AttentionWithContext.attention_with_context import AttentionWithContext
 from keras_layer_normalization import LayerNormalization
 
+
 """ Global variables """
-MCTS_TIME = 5      # second, default 30
+MCTS_TIME = 20      # second
 MAX_SENTENCE = 10   # max length of template
 MAX_BACKUP = 5
 MATCH_TABLE = [["33", "11", "11", "11", "11", "11", "-1", "11", "11", "11", "13", "-1", "-1", "-1", "-1", "11"],
@@ -60,9 +76,17 @@ MATCH_TABLE = [["33", "11", "11", "11", "11", "11", "-1", "11", "11", "11", "13"
 MATCH_TABLE = np.array(MATCH_TABLE, dtype='=U2') # unicode string with 2 digit length
 i_lower_tri = np.tril_indices(16, k=-1)          # lower triangle indices with diagonal offset -1(below)
 MATCH_TABLE[i_lower_tri] = MATCH_TABLE.T[i_lower_tri]
+
 DATABASE = "ConceptNet"
-# DATABASE = "ConceptNet_expand_synonyms"
 CURRENT_PATH = pathlib.Path(__file__).parent.resolve()
+TEMPLATES = ["Template_1", "Template_2", "Template_4", "Template_5", "Template_6", "Template_7", "Template_8"] # select one of the templates(template_3 is excluded)
+# TEMPLATES = ["Template_9"]
+MAX_PARAGRAPH_NUM = 10 # number of generated texts
+MAX_SYNONYM_PARAGRAPH_NUM = 10
+SENTIMENT_FORWARD_STEP = 0.9 # concept with the same sentiment will move forward in list of concepts
+simulate_with_WE_step = 0
+GENERATED_PARAGRAPH_DIR_PATH = CURRENT_PATH / r"output"
+jieba.set_dictionary(CURRENT_PATH / r'data\PTT_dict.csv')
 
 """ NN global """
 MAX_WORD_NUM = 10       # max length of words in a sentence
@@ -88,44 +112,36 @@ CN_end = list()
 CN_relation = list()
 CN_surfacetext = list()
 CN_start_concept = list()
+
 """ Cilin DB """
 cilin_data = list()
 cilin_coding_sub1 = list()
 cilin_coding_sub2 = list()
+
 """ Sentiment """
 positive = set()
 negative = set()
 neutral = set()
+
 """ Synonym """
 synonym_dict = dict()
+
 """ POS """
-# concept_pos_combined_dict.pkl: dict[concept_seg]:concept_pos
-conceptnet_pos_dict_path = CURRENT_PATH / r"data\conceptnet_pos_combined_dict.pkl"
-conceptnet_pos_combined_dict = dict()
+conceptnet_pos_combined_dict = dict() # dict[concept_seg]:concept_pos
+
 """ concept to concept_segs """
-# concept2seg_dict.pkl: dict[concept]:concept_segs
-concept2seg_dict_path = CURRENT_PATH / r'data\concept2seg_dict.pkl'
-concept2seg_dict = dict()
+concept2seg_dict = dict() # dict[concept]:concept_segs
+
 """ NN """
-NN_model = load_model(CURRENT_PATH / r"model\sentence_5_train_SENTLENGTH_10_replaced_concept_in_conceptnet_re.9_min_replaced_sent_2_hu256_dr.20_HAN.h5", custom_objects={"AttentionWithContext": AttentionWithContext, "LayerNormalization":LayerNormalization})
+NN_model = load_model(CURRENT_PATH / r"model\coherence_model.h5", custom_objects={"AttentionWithContext": AttentionWithContext, "LayerNormalization":LayerNormalization})
 embedding_model = 0
-WE_DIMENSIONS = 0
 word2idx = dict()
 idx2word = dict()
-file_w = open(CURRENT_PATH / r"output\mcts_.txt", 'w', encoding="UTF-8")
 
 invalid_sent_num = 0
 total_paragraph_num = 0
 invalid_sent_list = list()
 
-GENERATED_PARAGRAPH_DIR_PATH = CURRENT_PATH / r"output"
-TEMPLATES = ["Template_1", "Template_2", "Template_4", "Template_5", "Template_6", "Template_7", "Template_8"] # select one of the templates(template_3 is excluded)
-# TEMPLATES = ["Template_9"]
-MAX_PARAGRAPH_NUM = 10
-MAX_SYNONYM_PARAGRAPH_NUM = 10
-SENTIMENT_FORWARD_STEP = 0.9   # concept with the same sentiment will move forward in list of concepts
-simulate_with_WE_step = 0
-jieba.set_dictionary(CURRENT_PATH / r'data\PTT_dict.csv')
 
 def main():
     global MCTS_TIME, conceptnet_pos_combined_dict, concept2seg_dict, simulate_with_WE_step
@@ -134,8 +150,8 @@ def main():
     vocab_list_30 = readVocabList_freq(30)
     vocab_list_150 = readVocabList_freq(150)
     loadDB()
-    conceptnet_pos_combined_dict = load_obj(conceptnet_pos_dict_path)
-    concept2seg_dict = load_obj(concept2seg_dict_path)
+    conceptnet_pos_combined_dict = load_obj(CURRENT_PATH / r"data\conceptnet_pos_combined_dict.pkl")
+    concept2seg_dict = load_obj(CURRENT_PATH / r'data\concept2seg_dict.pkl')
     loadSynonyms(vocab_list_150)
     loadPretrainedEmbedding(vocab_list_30)
 
@@ -152,10 +168,9 @@ def main():
         root = Node()
         current_node = Node()
         next_node = Node()
-
         templateInitialize()
 
-        # random.shuffle(TEMPLATES)  #需要random sort時解開
+        random.shuffle(TEMPLATES)  #需要random sort template時解開
         schema = copy.deepcopy(TEMPLATES)
         getattr(sys.modules[__name__], schema[0])()
 
@@ -176,7 +191,7 @@ def main():
         while step < totalStep():
             # reset template and mode
             getattr(sys.modules[__name__], schema[0])()
-            simulate_with_WE_step = int(round(totalStep() / 2, 0))  #5.15
+            simulate_with_WE_step = int(round(totalStep() / 2, 0))
 
             # initialization
             if step == 0:
@@ -202,11 +217,6 @@ def main():
                 if current_concept_ == 1:
                     continue
                 template[sent][current_concept_-2] = node_.relation()
-
-                if template[sent][0] == "":
-                    pdb.set_trace()
-                    print()
-
                 if node_.mode() == 2:
                     template[sent][1] = ""
                     continue
@@ -231,7 +241,7 @@ def main():
                 concepts[sentence][current_concept] = next_node.data()
 
             if not next_node.data():
-                sys.stderr.write("MCTS need more time to explore\n")
+                sys.stderr.write("MCTS needs more time to explore\n")
                 sys.exit(-1)
             else:
                 selected_node.append(Node(next_node))
@@ -267,8 +277,6 @@ def main():
             printConcepts(selected_node)
             step += 1
 
-            file_w.write("step:"+str(step)+'\n')
-            file_w.write("MCTS_TIME:"+str(MCTS_TIME)+'\n')
             if totalStep() - step < 3:
                 MCTS_TIME = 10
             elif step % 4 == 0:
@@ -290,11 +298,9 @@ def main():
         print("invalid_sent:")
         for sent in invalid_sent_list:
             print(sent)
-
         paragraph_count += 1
 
     print("change start concept count:", change_start_concept_count)
-    file_w.close()
 
 
 #----------------------------------------------------------------------MCTS----------------------------------------------------------------------
@@ -324,7 +330,6 @@ def MCTS(node, current_step, past_concepts, schema):
         template = copy.deepcopy(template_copy)
         current_node = node
         depth = current_step  # reset depth
-
         print("Selection:(Root:第", currentSentence(current_step), "句的C", currentConcept(current_step), ")\n", current_node.data(), sep="")
 
         while not current_node.isLeaf():
@@ -352,11 +357,6 @@ def MCTS(node, current_step, past_concepts, schema):
             if mode[sentence] == 2 and current_concept == 2:
                 template[sentence][current_concept-1] = ""
 
-            #test
-            if mode[sentence] == 2 and concepts[sentence][2] != "":
-                pdb.set_trace()
-            #test
-
             # save selected nodes
             if (mode[sentence] != 2 and current_concept == 3) or (mode[sentence] == 2 and current_concept == 2):
                 concepts[sentence+1][0] = node_to_explore.data()
@@ -376,7 +376,7 @@ def MCTS(node, current_step, past_concepts, schema):
         if current_node.isVisited():
             expand_status = Expansion(current_node, depth, concepts)
             # 0:successful, -1:terminal, -99:no associate concept(that concept can't be used)
-            if expand_status == 0 or expand_status == -99:
+            if expand_status in (0, -99):
                 concepts = copy.deepcopy(reset_concepts)
                 continue
             if expand_status == -100:  # need to change the schema
@@ -394,7 +394,7 @@ def MCTS(node, current_step, past_concepts, schema):
                 if backup_template[sentence][0]:
                     updateTemplateAndMode(sentence)
                     expand_status = Expansion(current_node, depth-1, concepts)
-                    if expand_status == 0 or expand_status == -99:
+                    if expand_status in (0, -99):
                         concepts = copy.deepcopy(reset_concepts)
                         continue
                     if expand_status == -100:  # need to change the schema
@@ -414,7 +414,6 @@ def MCTS(node, current_step, past_concepts, schema):
 
     if not selected_node.data():
         sys.stderr.write("MCTS doesn't select any child node\n")
-        pdb.set_trace()
         sys.exit(-1)
 
     print("MCTS select:", selected_node.data())
@@ -432,7 +431,6 @@ N(vi):vi節點被訪問次數
 """
 # Select the node with highest UCT value
 def Selection(node, target_sentiment):
-    # print("----------------Selection---------------")
     uct_value = 0
     alpha = 0.25
     max_ = -100
@@ -466,7 +464,7 @@ def Expansion(node, depth, concepts):
     buf = list()
 
     if current_concept > 3:
-        pdb.set_trace()
+        # pdb.set_trace()
         print(depth)
         print(current_concept)
 
@@ -512,7 +510,7 @@ def Expansion(node, depth, concepts):
         else:                        # c2 expand c3
             if mode[sentence] == 1:  # end mode時，tree的順序為C2-C1-C3，C1在第二層
                 c1 = node.data()
-            else:			       # 假如要expand的node是C2，C2的parent是C1
+            else:			         # 假如要expand的node是C2，C2的parent是C1
                 c1 = concepts[sentence][0]
 
     # C1's serach position is in End
@@ -529,7 +527,7 @@ def Expansion(node, depth, concepts):
         if duplicate_depth != -1:
             buf.remove(concept)
 
-    # 透過association chcek刪除不適用的node  6.6
+    # 透過association chcek刪除不適用的node
     if assoc_flag[sentence][current_concept]:
         assoc_sentence = int(assoc_flag[sentence][current_concept][0])
         assoc_concept = int(assoc_flag[sentence][current_concept][1])
@@ -549,7 +547,6 @@ def Expansion(node, depth, concepts):
         print(concepts)
         print(template)
         if sentence == 2 and current_concept == 1:
-            # pdb.set_trace()
             pass
         if ratio > 0.7:
             buf.clear()
@@ -586,7 +583,6 @@ def Expansion(node, depth, concepts):
             child.set_mode(mode[sentence])
     elif current_concept == 2:
         node.set_mode(mode[sentence])
-
     return 0
 
 
@@ -677,9 +673,9 @@ def Simulation(node, depth, past_concepts, schema):
             match = Match(match_str, swap_flag, sentence)
             c1_search_position_to_c2 = "Start"
             c1_search_position_to_c3 = "Start"
-            if match == 0 or match == 1:
+            if match in (0, 1):
                 c1_search_position_to_c2 = "End"
-            if match == 0 or match == 2:
+            if match in (0, 2):
                 c1_search_position_to_c3 = "End"
 
             # if start concept is end node, swap the search position
@@ -866,7 +862,6 @@ def Simulation(node, depth, past_concepts, schema):
 
                         # 如果update後mode有變化，也改變node的mode
                         if tmp_mode != -1 and tmp_mode != mode[sentence]:
-                            # pdb.set_trace()
                             node.set_mode(mode[sentence])
                     # end mode且要刪除的是simulated node時，離開並刪除此node
                     elif mode[sentence] == 1 and (sentence == start_sentence) and (simulated_concept == 2):  # C2是simulated node，是已固定的
@@ -954,11 +949,6 @@ def Simulation(node, depth, past_concepts, schema):
                 rel_1, rel_2 = rel_2, rel_1
                 surfacetext_1, surfacetext_2 = surfacetext_2, surfacetext_1
                 match = Match(match_str, False, sentence)  # get correct match in normal relation order
-
-            # test
-            if c3 == "":
-                pdb.set_trace()
-            # test
 
             saveConcepts(concepts, c1, c2, c3, sentence)
 
@@ -1153,13 +1143,6 @@ def Simulation(node, depth, past_concepts, schema):
 
     # predict paragraph score
     score = predictScore(pred_paragraph)
-
-    file_w.write('"' + '\n')
-    for sent in pred_paragraph:
-        file_w.write(sent + '\n')
-    file_w.write("Score:" + str(score) + '\n')
-    file_w.write("fixed node num:" + str(depth) + '\n')
-    file_w.write('--"' + '\n')
     print()
     print(node.data(), "'s simulation score:", score)
 
@@ -1205,8 +1188,6 @@ def backToSentence(c1, duplicate_concept_str, sentence, duplicate_depth, buf_c2,
     ref_sentence = int(assoc_flag[sentence][0][0])
     ref_concept = int(assoc_flag[sentence][0][1])
     ref_concept = resetConceptsPosition(ref_sentence, ref_concept)
-    # print("ref_sentence:", ref_sentence)
-    # print("ref_concept:", ref_concept)
 
     #所引用的concept是一開始的start concept
     if ref_concept == 0:
@@ -1220,8 +1201,6 @@ def backToSentence(c1, duplicate_concept_str, sentence, duplicate_depth, buf_c2,
 
     duplicate_sentence = currentSentence(duplicate_depth)
     duplicate_concept = currentConcept(duplicate_depth)-1
-    # print("duplicate_sentence:", duplicate_sentence)
-    # print("duplicate_concept:", duplicate_concept)
     if duplicate_concept == 1:
         buf_dup = buf_c2
     elif duplicate_concept == 2:
@@ -1367,12 +1346,7 @@ def selectSurfacetext(c1, cx, cx_search_position, rel):
             index.append(index_2[i])
 
     if not index:
-        pdb.set_trace()
         sys.stderr.write("c1_search_position:"+invertStartEnd(cx_search_position)+"\ncx_search_position:"+cx_search_position+"\nC1:"+c1+"\nCx:"+cx+"\nRelation:"+rel+'\n')
-    else:  # test之後要刪掉
-        surfacetext = CN_surfacetext[index[0]]
-
-    # print("surfacetext:", surfacetext)
     return surfacetext
 
 
@@ -1401,23 +1375,12 @@ def updateTemplateAndMode(sentence):
     template[sentence][0] = backup_template[sentence][0]
     template[sentence][1] = backup_template[sentence][1]
 
-    if template[sentence][0] == "":
-        pdb.set_trace()
-        print()
-
     mode[sentence] = backup_mode[sentence]
     backup_mode[sentence] = -1
-
-    # for i in range(len(backup_template[sentence])):
-        # print("backup_template[", sentence, "][", i, "]:", backup_template[sentence][i])
 
     for i in range(len(backup_template[sentence])-2):
         backup_template[sentence][i] = backup_template[sentence][i+2]
         backup_template[sentence][i+2] = ""
-
-    # print("\nAfter updating:")
-    # for i in range(len(backup_template[sentence])):
-        # print("backup_template[", sentence, "]", i, "]:", backup_template[sentence][i])
 
 
 def updateTemplate(sentence, rel, current_concept):
@@ -1437,27 +1400,15 @@ def updateTemplate(sentence, rel, current_concept):
         template[sentence][0] = backup_template[sentence][backup_index-1]
         template[sentence][1] = backup_template[sentence][backup_index]
 
-    if template[sentence][0] == "":
-        pdb.set_trace()
-        print()
-
-    # print("sentence:", sentence)
-    # print("Before updating:")
-    # print(backup_template[sentence])
-
     # 清除backup_index前面的資料(包含自己)
     for i in range(backup_index+1):
         backup_template[sentence][i] = ""
-    # print(backup_template[sentence])
     # 將正在使用的backup_template後面的資料往前挪，原本的位置設為null
     insert_index = 0
     for i, rel in enumerate(backup_template[sentence][:]):
         if rel:
             backup_template[sentence].insert(insert_index, backup_template[sentence].pop(i))
             insert_index += 1
-
-    # print("\nAfter updating:")
-    # print(backup_template[sentence])
 
 
 # change surfacetext when selecting a node.To make sure SurfaceText is the newest one
@@ -1469,7 +1420,6 @@ def updateSurfacetext(current_step, concepts, node, selected_node):
     current_concept = currentConcept(current_step)
 
     if (mode[sentence] == 2 and current_concept == 1) or (mode[sentence] != 2 and current_concept == 2):
-        # print("\nBefore revising SurfaceText:" + SurfaceText[sentence])
         if mode[sentence] == 2 and current_concept == 1:
             c1 = node.data()
             c2 = selected_node.data()
@@ -1508,7 +1458,6 @@ def updateSurfacetext(current_step, concepts, node, selected_node):
                 c1_search_position_to_c2, c1_search_position_to_c3 = c1_search_position_to_c3, c1_search_position_to_c2
             match = c1_search_position_to_c2*2 + c1_search_position_to_c3  # match is binary presentation
             Generate(c1, c2, c3, rel_1, rel_2, surfacetext_1, surfacetext_2, sentence, match)
-        # print("After revising SurfaceText:" + SurfaceText[sentence])
 
 
 # Delete the template from the schema list and change schema
@@ -1531,38 +1480,15 @@ def deleteUselessConcept(removing_concept, ref_sentence, ref_concept, buf_c2, bu
     if ref_concept == 1:  # C1使用的是前面句子的C2 or end mode的C1
         print("將要刪除buf_c2[", ref_sentence, "](", len(buf_c2[ref_sentence]), ")的[", removing_concept, "]", sep="")
         if buf_c2[ref_sentence]:
-            # test
-            if removing_concept not in buf_c2[ref_sentence]:
-                pdb.set_trace()
-                print()
-            # test
             buf_c2[ref_sentence].remove(removing_concept)
-        else:
-            pdb.set_trace()
-            print()
         c2_reselect_flag = True
         c3_reselect_flag = False
     elif ref_concept == 2:  # C1使用的是前面句子的C3
         print("將要刪除buf_c3[", ref_sentence, "](", len(buf_c3[ref_sentence]), ")的[", removing_concept, "]", sep="")
         if buf_c3[ref_sentence]:
-            # test
-            if removing_concept not in buf_c3[ref_sentence]:
-                pdb.set_trace()
-                print()
-            # test
             buf_c3[ref_sentence].remove(removing_concept)
-        else:
-            pdb.set_trace()
-            print()
         c2_reselect_flag = False
         c3_reselect_flag = True
-    # test
-    else:
-        print("ERROR!!!!")
-        print("ref_concept:", ref_concept)
-        pdb.set_trace()
-        print()
-    # test
 
 
 # Delete the node(or node on upper layer) which is useless in tree
@@ -1595,7 +1521,6 @@ def deleteUselessNode(node, depth):
                 node = node.parent()
                 depth -= 1
             else:
-                # pdb.set_trace()
                 sys.stderr.write("Error(deleteUselessNode), can't delete root\n")
                 return -100
 
@@ -1688,7 +1613,6 @@ def printFinalResult(selected_node, schema):
     concept用同義詞取代，因為不是每個paragraph換完synonym後都還能保持原意，所以用neural network 做 prediction
     挑出前幾分數高的，從這裡面隨機挑選一個，當成final output
     """
-    file_w.write('------------------------Synonym part------------------------\n')
     synonym_paragraph_score = dict()
     for i in range(MAX_SYNONYM_PARAGRAPH_NUM):
         pred_paragraph = SurfaceText[:total_sentence]
@@ -1703,7 +1627,6 @@ def printFinalResult(selected_node, schema):
             pred_paragraph.pop(4)
         elif schema[0] == "Template_3":
             pred_paragraph[2] = pred_paragraph[2] + '，' + ' '.join(pred_paragraph[3].replace(concepts[3][0], '').split())
-            # pred_paragraph[2] = pred_paragraph[2] + '，會讓人想要 ' + concepts[3][1]
             pred_paragraph.pop(3)
         elif schema[0] == "Template_4":
             if mode[3] == 2:
@@ -1748,7 +1671,6 @@ def printFinalResult(selected_node, schema):
             pred_paragraph[j] = ' '.join(pred_paragraph[j].split())
 
         score = predictScore(pred_paragraph)
-        file_w.write('score:'+str(score)+'\n')
         if score in synonym_paragraph_score:
             synonym_paragraph_score[score].append(pred_paragraph + ['||'] + concepts)
         else:
@@ -1766,7 +1688,6 @@ def printFinalResult(selected_node, schema):
     print("\nFinal Result(replaced with synonyms)")
     for sent in pred_paragraph:
         print(sent)
-        file_w.write(sent+'\n')
 
     # 省略開頭concept
     if schema[0] == "Template_1":
@@ -1801,7 +1722,6 @@ def replaceWithPronoun(concepts):
     replace_flag = False
 
     for i in range(1, total_sentence):
-        # for m in range(total_sentence):
         for m in range(i):
             for n in range(3):
                 if concepts[m][n] == concepts[i][0]:
@@ -1812,7 +1732,7 @@ def replaceWithPronoun(concepts):
                             concepts[i][0] = "他"
                             replace_flag = True
                             break
-                        elif cilin_coding_sub2[cilin_index] == "Bi":  # Bi分類為動物
+                        if cilin_coding_sub2[cilin_index] == "Bi":  # Bi分類為動物
                             SurfaceText[i] = SurfaceText[i].replace('['+concepts[i][0]+']', "[牠]")
                             concepts[i][0] = "牠"
                             replace_flag = True
@@ -1830,7 +1750,6 @@ def replaceWithSynonym(pred_paragraph, concepts):
         for j in range(3):
             if concepts[i][j]:
                 if concepts[i][j] in synonym_dict:
-                    # replaced_rate = 0.6
                     replaced_rate = 0.9
                 else:
                     replaced_rate = 0
@@ -1844,8 +1763,7 @@ def replaceWithSynonym(pred_paragraph, concepts):
                             pred_paragraph[i] = pred_paragraph[i].replace(concepts[i][j], synonym)
                             concepts[i][j] = synonym
                             break
-                        else:
-                            synonyms.pop(0)
+                        synonyms.pop(0)
     return pred_paragraph
 
 
@@ -1958,7 +1876,7 @@ def sameSentiment(nodes_list, target_sentiment):
         target_sentiment_list.append(target_sentiment)
 
     # target_sentiment為正or負時，後面接中性詞，盡量讓相反的詞性不被選到
-    if target_sentiment == "Positive" or target_sentiment == "Negative":
+    if target_sentiment in ("Positive", "Negative"):
         second_sentiment= "Neutral"
     else:
         second_sentiment= ""
@@ -2032,7 +1950,7 @@ def assocConcepts(target_concept, concept_list):
             words_vec /= seg_num  # average word embedding
             other_wordsvec_list.append(words_vec)
         else:
-            other_wordsvec_list.append(np.ones(WE_DIMENSIONS))
+            other_wordsvec_list.append(np.ones(embedding_model.vector_size))
             OOV_index_set.add(i)
 
     cosine_sim = embedding_model.cosine_similarities(target_concept_wordvec, other_wordsvec_list)
@@ -2208,17 +2126,16 @@ def currentConcept(depth):
             if step-1 == depth:
                 return 1
             return -1
-        else:
-            step += 3
-            if step < depth:
-                continue
-            if step == depth:
-                return 3
-            if (step-1) == depth:
-                return 2
-            if step-2 == depth:
-                return 1
-            return -1
+        step += 3
+        if step < depth:
+            continue
+        if step == depth:
+            return 3
+        if (step-1) == depth:
+            return 2
+        if step-2 == depth:
+            return 1
+        return -1
 
 
 def invertStartEnd(s):
@@ -2226,13 +2143,12 @@ def invertStartEnd(s):
         if s == "Start":
             return "End"
         return "Start"
-    else:
-        if s == '1':
-            return '2'
-        if s == '2':
-            return '1'
-        sys.stderr.write("ERROR!(invertStartEnd)\n")
-        sys.exit(-1)
+    if s == '1':
+        return '2'
+    if s == '2':
+        return '1'
+    sys.stderr.write("ERROR!(invertStartEnd)\n")
+    sys.exit(-1)
 
 
 def swapConcepts(concepts):
@@ -2256,19 +2172,6 @@ def cilinIndexes(s):
         if s == cilin_data[i]:
             indexList.append(i)
     return indexList
-
-
-"""
-def non_outliers_modified_z_score(a):
-    #MAD(median absolute deviation): median(abs(xi-median(X)))
-    #modified z_score: 0.6745*(xi-median(X)) / MAD
-
-    threshold = 3.5
-    median_ = np.median(a)
-    MAD = np.median([np.abs(a - median_)])
-    modified_z_scores = 0.6745 * (a - median_) / (MAD if MAD else 1.)
-    return a[np.abs(modified_z_scores) < threshold]
-"""
 
 
 # Load ConceptNet, Cilin, Sentiment DB
@@ -2419,7 +2322,7 @@ def Supplement_MotivatedByGoal(concept):
 
     if pos == "V":
         supplement = "來"
-    elif pos == "N" or pos == "unknown":
+    elif pos in ("N", "unknown"):
         supplement = "，是為了"
     return supplement
 
@@ -2506,45 +2409,6 @@ def Template_2():
     sentiment[3][2] = "02"
 
 
-#暫時不採用
-"""
-def Template_3():
-    print("--------------------Schema 3--------------------")
-
-    template[0][0] = "Desires"
-    template[0][1] = "IsA"
-    template[1][0] = "HasFirstSubevent"
-    template[1][1] = "MotivatedByGoal"
-    template[2][0] = "Causes"
-    template[2][1] = "Causes"
-    template[3][0] = "CausesDesire"
-    template[4][0] = "NotDesires"
-    template[4][1] = "HasProperty"
-
-    mode[0] = 0
-    mode[1] = 1
-    mode[2] = 0
-    mode[3] = 2
-    mode[4] = 1
-
-    assoc_flag[1][0] = "01"
-    assoc_flag[2][0] = "01"
-    assoc_flag[3][0] = "22"
-    assoc_flag[4][0] = "00"
-
-    assoc_flag[1][2] = "00"
-    assoc_flag[2][1] = "00"
-    assoc_flag[2][2] = "21"
-    assoc_flag[3][1] = "00"
-
-    compound_pos[1][0] = "2"
-    compound_pos[1][1] = '1'
-
-    single_pos[3] = "Start"
-
-    sentiment[4][2] = "Negative"
-"""
-
 def Template_4():
     print("--------------------Schema 4--------------------")
 
@@ -2597,7 +2461,6 @@ def Template_4():
     single_pos[3] = "Start"
     single_pos[4] = "Start"
 
-    #雖然sentiment[sent][0]用不到，但為了保持和concepts的一致性所以空出來
     sentiment[1][1] = "02"
     sentiment[1][2] = "11"
 
@@ -2610,7 +2473,6 @@ def Template_4():
     sentiment[5][1] = "41"
     sentiment[5][2] = "41"
 
-# 5,6,7,8,9 的assoc_flag及情緒未檢查完成
 def Template_5():
     """最後呈現時，把最後一句放到倒數第二句後面"""
     print("--------------------Schema 5--------------------")
@@ -3382,7 +3244,6 @@ def Generate(c1, c2, c3, rel_1, rel_2, surfacetext_1, surfacetext_2, sentence, m
                 match_status = False
 
         elif rel_2 == "HasProperty":
-            # SurfaceText[sentence] = "[" + c1 + "]是[" + c3 + "]的，會令人想要[" + c2 + "]"
             SurfaceText[sentence] = "[" + c3 + "]的[" + c1 + "]" + trans_1 + "[" + c2 + "]"
 
         elif rel_2 == "HasSubevent":
@@ -3681,16 +3542,12 @@ class Node():
         self.search_position_ = ""
         self.terminal_ = False
         self.first_selection_ = False
-        # print("arg content:", arg)
         if not arg:
             self.data_ = ""
-            # print("No arg")
         elif len(arg) == 1:
             arg = arg[0]
-            # print("arg class:", arg.__class__.__name__)
             if arg.__class__.__name__ == "str":
                 self.data_ = arg
-                # print("str arg")
             elif arg.__class__.__name__ == "Node":
                 node = arg
                 self.data_ = node.data_
@@ -3720,20 +3577,15 @@ class Node():
         self.score_ = self.score_ + score
     # Select children with topN max score
     def selectChildren(self, target_sentiment):
-        total_visit_count = mean_score = 0
+        mean_score = 0
         selected_node = Node()
         nodes_dict = dict()
 
-        file_w.write("parent:\n" + self.data_ + "(" + str(self.visit_count_) + "):" + str(round(self.score_/self.visit_count_, 3)) + '\n')
-        file_w.write("select node:\n")
         for child in self.children_:
             if child.visit_count_ == 0:
                 continue
             mean_score = round(child.score_ / child.visit_count_, 3)
             nodes_dict[child] = mean_score
-            file_w.write(child.data_ + "(" + str(child.visit_count_) + "):" + str(mean_score) + '\n')
-            total_visit_count += child.visit_count_
-        file_w.write("total_visit_count:" + str(total_visit_count) + '\n')
 
         if not nodes_dict:
             return selected_node
@@ -3761,18 +3613,6 @@ class Node():
             topN = same_sentiment_count
 
         selected_node = random.choice(nodes_list[:topN])
-
-        file_w.write("select:\n" + selected_node.data_ + "(" + str(selected_node.visit_count_) + "):" + str(round(selected_node.score_/selected_node.visit_count_, 3)) + '\n')
-
-        # test
-        file_w.write("\nselected node's children:\n")
-        for child in selected_node.children_:
-            mean_score = 0
-            if child.visit_count_ != 0:
-                mean_score = round(child.score_ / child.visit_count_, 3)
-            file_w.write(child.data_ + "(" + str(child.visit_count_) + "):" + str(mean_score) + '\n')
-        # test
-
         return selected_node
 
     def visit_count(self):
@@ -3862,11 +3702,10 @@ def readVocabList_freq(freq):
 
 
 def loadPretrainedEmbedding(vocab_list_30):
-    global embedding_model, WE_DIMENSIONS
-    # embedding_model_path = "D:\\Andy\\研究所\\research\\model\\word_embedding\\ptt_wiki\\prediction_based\\best_model\\word2vec_500d_CBOW_alpha0025_sample000001_neg2_iter5.model"
-    embedding_model_path = CURRENT_PATH / r"model\SVD_700d_ws3_p0.5_SPPMI_k10_skip6_321.vec"
+    global embedding_model
+    # embedding_model_path = CURRENT_PATH / r"model\CBOW_500d.model" # prediction_based word embedding
+    embedding_model_path = CURRENT_PATH / r"model\SVD_700d.vec"           # count_based word embedding
     embedding_model = KeyedVectors.load_word2vec_format(embedding_model_path, binary=True)
-    WE_DIMENSIONS = embedding_model.vector_size
 
     for i, word in enumerate(vocab_list_30):
         word = word.strip()
@@ -3882,7 +3721,6 @@ def predictedData(pred_paragraph):
     total_paragraph_num += 1
     seg_num = 0
 
-    file_w.write("----------\n")
     for s, sentence in enumerate(pred_paragraph):
         sentence = sentence.replace('，', '').split(' ')
         for word in sentence:
@@ -3892,11 +3730,8 @@ def predictedData(pred_paragraph):
                     invalid_sent_list.append(sentence)
                     invalid_sent_num += 1
                     break
-                file_w.write(word+' ')
                 pred_x[s, seg_num-1] = word2idx[word]
         seg_num = 0
-        file_w.write('\n')
-    file_w.write("----------\n")
     return pred_x
 
 
