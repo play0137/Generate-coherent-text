@@ -160,12 +160,12 @@ def main():
         getattr(sys.modules[__name__], schema[0])()
 
         # select initial concept from ConceptNet automatically
-        # start_concept = random.choice(CN_start_concept)
-        # CN_start_concept.remove(start_concept)
+        start_concept = random.choice(CN_start_concept)
+        CN_start_concept.remove(start_concept)
         
         # select initial concept manually
-        start_concept = "狗"
-        print("start concept:", start_concept)
+        # start_concept = "狗"
+        # print("start concept:", start_concept)
         
         root.set_data(start_concept)
         if start_concept in synonym_dict:
