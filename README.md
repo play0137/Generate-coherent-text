@@ -14,11 +14,11 @@ Please refer to [Chinese ConceptNet](https://github.com/play0137/Chinese_Concept
 
 ## Models
 - [Word embedding model](https://github.com/play0137/Traditional_Chinese_word_embedding#chinese-word-embeddings)
-- [Discourse coherence model](https://mega.nz/file/vcAXzByB#qjZLRfwJ523rTlYvdY-h_gIFsk0hKzJNuiqHrBJDSx0)  
+- [Discourse coherence model](https://mega.nz/file/vcAXzByB#qjZLRfwJ523rTlYvdY-h_gIFsk0hKzJNuiqHrBJDSx0) (download link)  
   A DNN model which is regarded as a reward function in MCTS.  
   The positive samples are the original paragraphs, and the negative samples are paragraphs with replacement of other connected concepts in ConceptNet.  
   The training method is in the [discourse_coherence_model](https://github.com/play0137/Generate_coherent_text/blob/master/reports/discourse_coherence_model.pdf)
-  , and the experiments are in the [discourse_coherence_model_result](https://github.com/play0137/Generate_coherent_text/blob/master/reports/discourse_coherence_model_result.pdf).
+  , and the experiments are in the [discourse_coherence_model_result](https://github.com/play0137/Generate_coherent_text/blob/master/reports/discourse_coherence_model_result.pdf) report.
 
 # Usage
 
@@ -26,7 +26,7 @@ Please refer to [Chinese ConceptNet](https://github.com/play0137/Chinese_Concept
 - Create an environment with command  
   <code> conda create --name <env_name> --file requirements.txt </code>
 - Run MCTS.py (It takes minutes to run the program.)
-- Generated texts are in 
+- Generated texts are in the .\output folder
 
 # Reference
   
