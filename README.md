@@ -7,7 +7,7 @@
 The objective of this research is to generate a coherent and understandable text.  
 We extracted commonsense knowledge from [ConceptNet](https://conceptnet.io/) automatically and combined a constructed word embedding model and a designed Deep Neural Network (DNN) of discourse coherence model to evaluate the Chinese text selected by Monte-Carlo Tree Search (MCTS) algorithm.  
 
-We [evaluate](https://github.com/play0137/Generate_coherent_text/tree/master/evaluation) generated text by human rating, and the result shows that it is more coherent when using the discourse coherence model.
+We evaluate generated text by human rating, and the [result](https://github.com/play0137/Generate_coherent_text/tree/master/evaluation) shows that it is more coherent when using the discourse coherence model.
 
 ## Chinese ConceptNet
 Please refer to [Chinese ConceptNet](https://github.com/play0137/Chinese_ConceptNet).
