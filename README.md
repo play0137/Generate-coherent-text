@@ -40,3 +40,7 @@ BibTeX:
 &nbsp;&nbsp;&nbsp;&nbsp; pages = 136,  
 &nbsp;&nbsp;&nbsp;&nbsp; year = 2021  
 }  
+
+  # License
+  
+  This work is licensed under a [GNU General Public License](https://www.gnu.org/licenses/gpl-3.0.html).
