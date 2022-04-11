@@ -23,7 +23,7 @@ Please refer to [Chinese ConceptNet](https://github.com/play0137/Chinese_Concept
 # Usage
 
 - Download models above to the .\model folder
-- Create an environment with command  
+- Create a conda environment and install dependent packages with command  
   <code> conda create --name <env_name> --file requirements.txt </code>
 - Run MCTS.py (It takes minutes to run the program.)
 - Generated texts are in the .\output folder
