@@ -18,8 +18,7 @@ Please refer to [Chinese ConceptNet](https://github.com/play0137/Chinese_Concept
 - [Discourse coherence model](https://mega.nz/file/vcAXzByB#qjZLRfwJ523rTlYvdY-h_gIFsk0hKzJNuiqHrBJDSx0) (download link)  
   A DNN model which is regarded as a reward function in MCTS.  
   The positive samples are the original paragraphs, and the negative samples are paragraphs with replacement of other connected concepts in ConceptNet.  
-  The training method is in the [discourse_coherence_model](https://github.com/play0137/Generate_coherent_text/blob/master/reports/discourse_coherence_model.pdf)
-  , and the experiments are in the [discourse_coherence_model_result](https://github.com/play0137/Generate_coherent_text/blob/master/reports/discourse_coherence_model_result.pdf) report.
+  The training process and experiments are in the [reports](https://github.com/play0137/Generate_coherent_text/tree/master/reports).
 
 # Usage
 
