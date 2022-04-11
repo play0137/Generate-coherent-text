@@ -16,7 +16,7 @@ We take the human-written paragraphs as gold standards , and normalize the score
 ## Examples
 
 <p align="center">
-  <img width="690" height="600" src="./evaluation_generated_paragraphs.png">
+  <img width="710" height="580" src="./evaluation_generated_paragraphs.png">
 </p>
 
 We list some examples which are in the human evaluation dataset.  
