@@ -19,5 +19,6 @@ We take the human-written texts as gold standards , and normalize the scores fro
   <img width="710" height="580" src="./evaluation_generated_paragraphs.png">
 </p>
 
-We list some examples which are in the human evaluation dataset.  
-The examples on the left side are the highest score with that method, and the ones on the right side are the lowest score.
+Here are some examples of generated texts in the human evaluation dataset.    
+The examples on the left side are the highest score with that method, and the ones on the right side are the lowest score.  
+We can see that text without discourse coherence model (example C) is less coherent than using it (example B).
