@@ -1,21 +1,38 @@
 """
-This work includes data from ConceptNet 5, which was compiled by the
-Commonsense Computing Initiative. ConceptNet 5 is freely available under
-the Creative Commons Attribution-ShareAlike license (CC BY SA 3.0) from
-http://conceptnet.io.
+    MCTS.py is a program which can generate Chinese paragraph.
+    Copyright (C) 2022  Ying-Ren Chen
 
-The included data was created by contributors to Commonsense Computing
-projects, contributors to Wikimedia projects, DBPedia, OpenCyc, Games
-with a Purpose, Princeton University's WordNet, Francis Bond's Open
-Multilingual WordNet, and Jim Breen's JMDict.
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
 
-                                                                                                                                       
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+"""
+"""
+    This work includes data from ConceptNet 5, which was compiled by the
+    Commonsense Computing Initiative. ConceptNet 5 is freely available under
+    the Creative Commons Attribution-ShareAlike license (CC BY SA 3.0) from
+    http://conceptnet.io.
+
+    The included data was created by contributors to Commonsense Computing
+    projects, contributors to Wikimedia projects, DBPedia, OpenCyc, Games
+    with a Purpose, Princeton University's WordNet, Francis Bond's Open
+    Multilingual WordNet, and Jim Breen's JMDict.
+"""
+
+"""                                                                                                                                    
 Dependencies:
 python 3.9.12
 tensorflow 2.6.0
 keras 2.6.0
 gensim 4.1.2
-
 
 Reference:
     Ying-Ren Chen (2021). Generate coherent text using semantic embedding, common sense templates and Monte-Carlo tree search methods (Master's thesis, National Tsing Hua University, Hsinchu, Taiwan).
