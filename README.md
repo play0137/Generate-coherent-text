@@ -17,9 +17,9 @@ Please refer to [Chinese ConceptNet](https://github.com/play0137/Chinese_Concept
 - [Word embedding model](https://github.com/play0137/Traditional_Chinese_word_embedding#chinese-word-embeddings)
 - [Discourse coherence model](https://mega.nz/file/vcAXzByB#qjZLRfwJ523rTlYvdY-h_gIFsk0hKzJNuiqHrBJDSx0) (download link)  
   A DNN model which is regarded as a reward function in MCTS.  
-  The positive samples are the original paragraphs, and the negative samples are paragraphs with replacement of other connected concepts in ConceptNet.  
-  Words in a sentence or a paragraph are closely related.  
-	Concepts replacement makes paragraph less coherent even a single replacement.  
+  The positive samples are the original paragraphs, and the negative samples are paragraphs with replacement of other connected concepts which has the same POS in ConceptNet.  
+  Words in a sentence or a paragraph are closely related.
+  Concepts replacement makes paragraph less coherent even a single replacement.  
   The training processes and experiments are in the [reports](https://github.com/play0137/Generate_coherent_text/tree/master/reports).
 
 # Usage
