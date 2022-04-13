@@ -24,6 +24,6 @@ Lastly, select one of the best results as our final output text.
 
 The paragraphs on the left side are the positive samples and the right side are the negative ones.  
 The scores of positive samples are all higher than negative ones.  
-Four or five words in the first two examples are substituted by other connected words in ConceptNet, and the coherence model can distinguish them easily.
+Four or five words in the first two examples are substituted by other connected words which has the same POS in ConceptNet, and the coherence model can distinguish them easily.
 The rest of the examples only substitute two words, the model can still predict correctly.  
 It proves that the coherence model can actually distinguish the coherent and incoherent texts to some degree.
