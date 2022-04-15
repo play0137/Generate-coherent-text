@@ -4,7 +4,7 @@
   <img width="330" height="430" src="./System_overview.png">
 </p>
 
-The objective of this research is to generate a coherent and understandable text in Chinese.  
+The objective of this research is to generate coherent and understandable text in Chinese.  
 We extract commonsense knowledge from [ConceptNet](https://conceptnet.io/) automatically and select concepts by Monte-Carlo Tree Search (MCTS) algorithm.  
 Combine text by human-crafted templates and use a constructed word embedding model and a Deep Neural Network (DNN) of discourse coherence model to evaluate and ensure the coherence of the generated text.
 
